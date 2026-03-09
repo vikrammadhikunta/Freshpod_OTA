@@ -89,7 +89,7 @@ export default function App() {
       setUploadProgress(0);
       setUploadStatus(null);
 
-      const res = await axios.post("http://localhost:5000/add", formData, {
+      const res = await axios.post(`${import.meta.env.Backend_API_URl}/add`, formData, {
 
         onUploadProgress: (progressEvent) => {
 
