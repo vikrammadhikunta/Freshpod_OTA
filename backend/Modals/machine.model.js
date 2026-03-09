@@ -2,33 +2,35 @@ import mongoose from "mongoose";
 
 const fileSchema = new mongoose.Schema(
   {
-    public_id: { type: String },
-    url: { type: String },
-    format: { type: String },
-    size: { type: Number },
+    public_id: String,
+    url: String,
+    format: String,
+    size: Number,
   },
-  { _id: false } // important for nested object
+  { _id: false }
 );
 
 const machineSchema = new mongoose.Schema(
   {
     machineId: {
       type: String,
-      required: true,
-      unique: true,
+      required: true
     },
     machineName: {
       type: String,
-      required: true,
+      required: true
     },
     version: {
       type: String,
       required: true,
-      match: /^\d+\.\d+\.\d+$/,
+      match: /^\d+\.\d+\.\d+$/
     },
-    file: fileSchema, // proper nested schema
+    file: fileSchema
   },
   { timestamps: true }
 );
+
+/* unique firmware per version */
+machineSchema.index({ machineId: 1, version: 1 }, { unique: true });
 
 export default mongoose.model("Machine", machineSchema);

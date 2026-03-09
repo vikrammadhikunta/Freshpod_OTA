@@ -89,7 +89,7 @@ export default function App() {
       setUploadProgress(0);
       setUploadStatus(null);
 
-      const res = await axios.post(`${import.meta.env.Backend_API_URl}/add`, formData, {
+      const res = await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}/add`, formData, {
 
         onUploadProgress: (progressEvent) => {
 

@@ -6,20 +6,23 @@ import connectDB from "./db/connect.js";
 import Machine from "./Modals/machine.model.js";
 import { v2 as cloudinary } from "cloudinary";
 import streamifier from "streamifier";
-import dns from 'dns';
+import dns from "dns";
 
-dns.setServers(["1.1.1.1","8.8.8.8"]);
+dns.setServers(["1.1.1.1", "8.8.8.8"]);
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+console.log("🚀 Starting OTA Server...");
+
 connectDB();
 
 app.use(cors());
 app.use(express.json());
 
+/* ================= CLOUDINARY CONFIG ================= */
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -27,25 +30,40 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+console.log("☁️ Cloudinary configured");
+
+/* ================= MULTER ================= */
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 },
 });
 
+console.log("📦 Multer ready");
+
+/* ================= VERSION HELPER ================= */
 
 function incrementVersion(version) {
   if (!version) return "1.0.0";
 
   const parts = version.split(".").map(Number);
   parts[2] += 1;
+
   return parts.join(".");
 }
 
+/* ================= UPLOAD FIRMWARE ================= */
 
 app.post("/add", upload.single("file"), async (req, res) => {
   try {
+
+    console.log("\n📥 Upload request received");
+
     const { machineId, machineName } = req.body;
+
+    if (!machineId || !machineName) {
+      return res.status(400).json({ message: "Machine info missing" });
+    }
 
     if (!req.file) {
       return res.status(400).json({ message: "Firmware file required" });
@@ -55,8 +73,18 @@ app.post("/add", upload.single("file"), async (req, res) => {
       return res.status(400).json({ message: "Only .bin files allowed" });
     }
 
+    console.log("Machine:", machineId);
+    console.log("File:", req.file.originalname);
+
+    /* ---------- FIND LATEST VERSION ---------- */
+
     const latest = await Machine.findOne({ machineId }).sort({ createdAt: -1 });
+
     const version = incrementVersion(latest?.version);
+
+    console.log("Firmware version:", version);
+
+    /* ---------- CLOUDINARY UPLOAD ---------- */
 
     const publicId = `freshpod/${machineId}/${version}`;
 
@@ -67,23 +95,37 @@ app.post("/add", upload.single("file"), async (req, res) => {
         overwrite: true,
       },
       async (error, result) => {
+
         if (error) {
+          console.error("❌ Cloudinary error:", error);
           return res.status(500).json({ message: "Cloudinary upload failed" });
         }
 
-        const firmware = await Machine.create({
-          machineId,
-          machineName,
-          version,
-          file: {
-            public_id: result.public_id,
-            url: result.secure_url,
-            size: result.bytes,
+        console.log("☁️ Uploaded to Cloudinary:", result.secure_url);
+
+        /* ---------- UPSERT IN DATABASE ---------- */
+
+        const firmware = await Machine.findOneAndUpdate(
+          { machineId, version },
+          {
+            machineName,
+            file: {
+              public_id: result.public_id,
+              url: result.secure_url,
+              size: result.bytes,
+            },
           },
-        });
+          {
+            new: true,
+            upsert: true,
+          }
+        );
+
+        console.log("💾 Firmware stored in MongoDB:", firmware._id);
 
         res.json({
           message: "Firmware uploaded",
+          machineId,
           version,
           url: firmware.file.url,
         });
@@ -93,21 +135,27 @@ app.post("/add", upload.single("file"), async (req, res) => {
     streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
 
   } catch (err) {
-    console.error(err);
+    console.error("❌ Upload error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
 
+/* ================= GET LATEST FIRMWARE ================= */
 
 app.get("/:machineId", async (req, res) => {
   try {
+
     const { machineId } = req.params;
+
+    console.log(`\n🔍 Checking firmware for machine: ${machineId}`);
 
     const latest = await Machine.findOne({ machineId }).sort({ createdAt: -1 });
 
     if (!latest) {
       return res.status(404).json({ message: "Firmware not found" });
     }
+
+    res.setHeader("Cache-Control", "no-store");
 
     res.json({
       machineId,
@@ -116,10 +164,12 @@ app.get("/:machineId", async (req, res) => {
     });
 
   } catch (err) {
+    console.error("❌ GET error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
 
+/* ================= SERVER START ================= */
 
 app.listen(PORT, () => {
   console.log(`🚀 OTA Server running on port ${PORT}`);
