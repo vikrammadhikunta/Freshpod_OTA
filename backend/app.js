@@ -17,10 +17,21 @@ const PORT = process.env.PORT || 5000;
 
 console.log("🚀 Starting OTA Server...");
 
+/* ================= DATABASE ================= */
+
 connectDB();
 
+/* ================= MIDDLEWARE ================= */
+
 app.use(cors());
+app.options("*", cors());
 app.use(express.json());
+
+/* ================= HEALTH ROUTE ================= */
+
+app.get("/", (req, res) => {
+  res.send("🚀 OTA Firmware Server Running");
+});
 
 /* ================= CLOUDINARY CONFIG ================= */
 
@@ -43,12 +54,9 @@ console.log("📦 Multer ready");
 
 /* ================= VERSION HELPER ================= */
 
-function incrementVersion(version) {
-  if (!version) return "1.0.0";
-
+function incrementVersion(version = "1.0.0") {
   const parts = version.split(".").map(Number);
   parts[2] += 1;
-
   return parts.join(".");
 }
 
@@ -82,7 +90,7 @@ app.post("/add", upload.single("file"), async (req, res) => {
 
     const version = incrementVersion(latest?.version);
 
-    console.log("Firmware version:", version);
+    console.log("New firmware version:", version);
 
     /* ---------- CLOUDINARY UPLOAD ---------- */
 
@@ -96,77 +104,101 @@ app.post("/add", upload.single("file"), async (req, res) => {
       },
       async (error, result) => {
 
-        if (error) {
-          console.error("❌ Cloudinary error:", error);
-          return res.status(500).json({ message: "Cloudinary upload failed" });
-        }
+        try {
 
-        console.log("☁️ Uploaded to Cloudinary:", result.secure_url);
+          if (error) {
+            console.error("❌ Cloudinary error:", error);
+            return res.status(500).json({
+              message: "Cloudinary upload failed",
+            });
+          }
 
-        /* ---------- UPSERT IN DATABASE ---------- */
+          console.log("☁️ Uploaded to Cloudinary:", result.secure_url);
 
-        const firmware = await Machine.findOneAndUpdate(
-          { machineId, version },
-          {
+          /* ---------- SAVE NEW FIRMWARE RECORD ---------- */
+
+          const firmware = await Machine.create({
+            machineId,
             machineName,
+            version,
             file: {
               public_id: result.public_id,
               url: result.secure_url,
               size: result.bytes,
             },
-          },
-          {
-            new: true,
-            upsert: true,
-          }
-        );
+          });
 
-        console.log("💾 Firmware stored in MongoDB:", firmware._id);
+          console.log("💾 Firmware saved:", firmware._id);
 
-        res.json({
-          message: "Firmware uploaded",
-          machineId,
-          version,
-          url: firmware.file.url,
-        });
+          return res.json({
+            message: "Firmware uploaded",
+            machineId,
+            version,
+            url: firmware.file.url,
+          });
+
+        } catch (dbError) {
+
+          console.error("❌ Database error:", dbError);
+
+          return res.status(500).json({
+            message: "Database error",
+          });
+
+        }
+
       }
     );
 
     streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
 
   } catch (err) {
+
     console.error("❌ Upload error:", err);
-    res.status(500).json({ message: "Server error" });
+
+    return res.status(500).json({
+      message: "Server error",
+    });
+
   }
 });
 
 /* ================= GET LATEST FIRMWARE ================= */
 
 app.get("/:machineId", async (req, res) => {
+
   try {
 
     const { machineId } = req.params;
 
-    console.log(`\n🔍 Checking firmware for machine: ${machineId}`);
+    console.log(`🔍 Checking firmware for machine: ${machineId}`);
 
     const latest = await Machine.findOne({ machineId }).sort({ createdAt: -1 });
 
     if (!latest) {
-      return res.status(404).json({ message: "Firmware not found" });
+      return res.status(404).json({
+        message: "Firmware not found",
+      });
     }
 
     res.setHeader("Cache-Control", "no-store");
 
-    res.json({
+    return res.json({
       machineId,
       version: latest.version,
       url: latest.file.url,
     });
 
   } catch (err) {
+
     console.error("❌ GET error:", err);
-    res.status(500).json({ message: "Server error" });
+
+    return res.status(500).json({
+      message: "Server error",
+    });
+
   }
+
 });
 
 /* ================= SERVER START ================= */
