@@ -22,9 +22,10 @@ console.log("🚀 Starting OTA Server...");
 connectDB();
 
 /* ================= MIDDLEWARE ================= */
+app.use(cors({
+  origin: "https://frontend-yzhf.onrender.com"
+}));
 
-app.use(cors());
-app.options("*", cors());
 app.use(express.json());
 
 /* ================= HEALTH ROUTE ================= */
