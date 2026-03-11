@@ -22,6 +22,7 @@ console.log("🚀 Starting OTA Server...");
 connectDB();
 
 /* ================= MIDDLEWARE ================= */
+
 app.use(cors({
   origin: "https://frontend-yzhf.onrender.com"
 }));
@@ -55,7 +56,7 @@ console.log("📦 Multer ready");
 
 /* ================= VERSION HELPER ================= */
 
-function incrementVersion(version = "1.0.0") {
+function incrementVersion(version) {
   const parts = version.split(".").map(Number);
   parts[2] += 1;
   return parts.join(".");
@@ -64,6 +65,7 @@ function incrementVersion(version = "1.0.0") {
 /* ================= UPLOAD FIRMWARE ================= */
 
 app.post("/add", upload.single("file"), async (req, res) => {
+
   try {
 
     console.log("📥 Upload request received");
@@ -82,38 +84,51 @@ app.post("/add", upload.single("file"), async (req, res) => {
       return res.status(400).json({ message: "Only .bin files allowed" });
     }
 
-    /* ---------- GET LATEST VERSION ---------- */
+    console.log("Machine:", machineId);
+    console.log("File:", req.file.originalname);
 
-    const latest = await Machine.findOne({ machineId }).sort({ createdAt: -1 });
+    /* ---------- FIND LATEST VERSION ---------- */
 
-    const version = incrementVersion(latest?.version);
+    const latest = await Machine
+      .findOne({ machineId })
+      .sort({ createdAt: -1 });
+
+    const version = latest
+      ? incrementVersion(latest.version)
+      : "1.0.0";
+
+    console.log("New firmware version:", version);
 
     const publicId = `freshpod/${machineId}/${version}`;
 
-    /* ---------- CLOUDINARY UPLOAD (PROMISE WRAPPER) ---------- */
+    /* ---------- CLOUDINARY UPLOAD ---------- */
 
-    const uploadToCloudinary = () =>
-      new Promise((resolve, reject) => {
+    const uploadResult = await new Promise((resolve, reject) => {
 
-        const stream = cloudinary.uploader.upload_stream(
-          {
-            resource_type: "raw",
-            public_id: publicId,
-            overwrite: true,
-          },
-          (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          resource_type: "raw",
+          public_id: publicId,
+          overwrite: true,
+        },
+        (error, result) => {
+
+          if (error) {
+            return reject(error);
           }
-        );
 
-        streamifier.createReadStream(req.file.buffer).pipe(stream);
+          resolve(result);
 
-      });
+        }
+      );
 
-    const result = await uploadToCloudinary();
+      streamifier
+        .createReadStream(req.file.buffer)
+        .pipe(uploadStream);
 
-    console.log("☁️ Uploaded:", result.secure_url);
+    });
+
+    console.log("☁️ Uploaded to Cloudinary:", uploadResult.secure_url);
 
     /* ---------- SAVE TO DATABASE ---------- */
 
@@ -122,9 +137,9 @@ app.post("/add", upload.single("file"), async (req, res) => {
       machineName,
       version,
       file: {
-        public_id: result.public_id,
-        url: result.secure_url,
-        size: result.bytes,
+        public_id: uploadResult.public_id,
+        url: uploadResult.secure_url,
+        size: uploadResult.bytes,
       },
     });
 
@@ -142,15 +157,16 @@ app.post("/add", upload.single("file"), async (req, res) => {
     console.error("❌ Upload error:", err);
 
     return res.status(500).json({
-      message: "Server error",
+      message: err.message,
     });
 
   }
+
 });
 
 /* ================= GET LATEST FIRMWARE ================= */
 
-app.get("/:machineId", async (req, res) => {
+app.get("/firmware/:machineId", async (req, res) => {
 
   try {
 
@@ -158,7 +174,9 @@ app.get("/:machineId", async (req, res) => {
 
     console.log(`🔍 Checking firmware for machine: ${machineId}`);
 
-    const latest = await Machine.findOne({ machineId }).sort({ createdAt: -1 });
+    const latest = await Machine
+      .findOne({ machineId })
+      .sort({ createdAt: -1 });
 
     if (!latest) {
       return res.status(404).json({
