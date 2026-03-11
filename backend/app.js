@@ -66,7 +66,7 @@ function incrementVersion(version = "1.0.0") {
 app.post("/add", upload.single("file"), async (req, res) => {
   try {
 
-    console.log("\n📥 Upload request received");
+    console.log("📥 Upload request received");
 
     const { machineId, machineName } = req.body;
 
@@ -82,76 +82,60 @@ app.post("/add", upload.single("file"), async (req, res) => {
       return res.status(400).json({ message: "Only .bin files allowed" });
     }
 
-    console.log("Machine:", machineId);
-    console.log("File:", req.file.originalname);
-
-    /* ---------- FIND LATEST VERSION ---------- */
+    /* ---------- GET LATEST VERSION ---------- */
 
     const latest = await Machine.findOne({ machineId }).sort({ createdAt: -1 });
 
     const version = incrementVersion(latest?.version);
 
-    console.log("New firmware version:", version);
-
-    /* ---------- CLOUDINARY UPLOAD ---------- */
-
     const publicId = `freshpod/${machineId}/${version}`;
 
-    const uploadStream = cloudinary.uploader.upload_stream(
-      {
-        resource_type: "raw",
-        public_id: publicId,
-        overwrite: true,
-      },
-      async (error, result) => {
+    /* ---------- CLOUDINARY UPLOAD (PROMISE WRAPPER) ---------- */
 
-        try {
+    const uploadToCloudinary = () =>
+      new Promise((resolve, reject) => {
 
-          if (error) {
-            console.error("❌ Cloudinary error:", error);
-            return res.status(500).json({
-              message: "Cloudinary upload failed",
-            });
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            resource_type: "raw",
+            public_id: publicId,
+            overwrite: true,
+          },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
           }
+        );
 
-          console.log("☁️ Uploaded to Cloudinary:", result.secure_url);
+        streamifier.createReadStream(req.file.buffer).pipe(stream);
 
-          /* ---------- SAVE NEW FIRMWARE RECORD ---------- */
+      });
 
-          const firmware = await Machine.create({
-            machineId,
-            machineName,
-            version,
-            file: {
-              public_id: result.public_id,
-              url: result.secure_url,
-              size: result.bytes,
-            },
-          });
+    const result = await uploadToCloudinary();
 
-          console.log("💾 Firmware saved:", firmware._id);
+    console.log("☁️ Uploaded:", result.secure_url);
 
-          return res.json({
-            message: "Firmware uploaded",
-            machineId,
-            version,
-            url: firmware.file.url,
-          });
+    /* ---------- SAVE TO DATABASE ---------- */
 
-        } catch (dbError) {
+    const firmware = await Machine.create({
+      machineId,
+      machineName,
+      version,
+      file: {
+        public_id: result.public_id,
+        url: result.secure_url,
+        size: result.bytes,
+      },
+    });
 
-          console.error("❌ Database error:", dbError);
+    console.log("💾 Firmware saved:", firmware._id);
 
-          return res.status(500).json({
-            message: "Database error",
-          });
-
-        }
-
-      }
-    );
-
-    streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
+    return res.json({
+      message: "Firmware uploaded",
+      machineId,
+      version,
+      url: firmware.file.url,
+    });
 
   } catch (err) {
 
