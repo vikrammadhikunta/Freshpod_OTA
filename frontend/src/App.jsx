@@ -92,7 +92,9 @@ export default function App() {
       setUploadProgress(0);
       setUploadStatus(null);
 
-      const res = await axios.post(`https://freshpod-ota-r3b9.onrender.com/add`, formData, {
+      console.log(import.meta.env.VITE_API_URL);
+
+      const res = await axios.post(`${import.meta.env.VITE_API_URL}/add`, formData, {
 
         onUploadProgress: (progressEvent) => {
 
