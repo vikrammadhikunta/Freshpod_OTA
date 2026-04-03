@@ -92,9 +92,9 @@ export default function App() {
       setUploadProgress(0);
       setUploadStatus(null);
 
-      console.log(import.meta.env.VITE_API_URL);
+      // console.log(import.meta.env.VITE_API_URL);
 
-      const res = await axios.post(`${import.meta.env.VITE_API_URL}/add`, formData, {
+      const res = await axios.post(`https://freshpod-ota-r3b9.onrender.com/add`, formData, {
 
         onUploadProgress: (progressEvent) => {
 
@@ -588,3 +588,4 @@ if (typeof document !== 'undefined') {
   style.textContent = globalStyles;
   document.head.appendChild(style);
 }
+
