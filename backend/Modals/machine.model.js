@@ -17,6 +17,12 @@ const machineSchema = new mongoose.Schema({
     public_id: String,
     url: String,
     size: Number,
+  },
+  qrvalue: {
+    type: Number,
+    enum: [0, 1, 2],
+    required: true,
+    default: 0,
   }
 }, { timestamps: true });
 

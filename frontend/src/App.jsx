@@ -9,14 +9,16 @@ import {
   Loader,
   Info,
   Cpu,
-  HardDrive
+  HardDrive,
+  IndianRupee
 } from "lucide-react";
 
 export default function App() {
 
   const [form, setForm] = useState({
     machineId: "",
-    machineName: ""
+    machineName: "",
+    amount: ""
   });
 
   const [file, setFile] = useState(null);
@@ -81,6 +83,7 @@ export default function App() {
 
     formData.append("machineId", form.machineId);
     formData.append("machineName", form.machineName);
+    formData.append("amount", form.amount);
     formData.append("file", file);
 
     try {
@@ -89,7 +92,7 @@ export default function App() {
       setUploadProgress(0);
       setUploadStatus(null);
 
-      const res = await axios.post(`https://freshpod-ota-r3b9.onrender.com/add`, formData, {
+      const res = await axios.post(`${import.meta.env.VITE_API_URL}/add`, formData, {
 
         onUploadProgress: (progressEvent) => {
 
@@ -109,7 +112,8 @@ export default function App() {
 
         setForm({
           machineId: "",
-          machineName: ""
+          machineName: "",
+          amount: ""
         });
 
         setFile(null);
@@ -120,6 +124,11 @@ export default function App() {
     } catch (err) {
 
       console.error(err);
+
+      if (err.response) {
+        alert(err.response.data.message);
+      }
+
       setUploadStatus("error");
 
     } finally {
@@ -139,7 +148,7 @@ export default function App() {
       <div style={styles.container}>
 
         <div style={styles.header}>
-          <Cpu size={32} color="#4f46e5" />
+          <Cpu size={32} color="white" />
           <h2 style={styles.title}>Firmware Upload Portal</h2>
           <p style={styles.subtitle}>Upload machine firmware</p>
         </div>
@@ -177,6 +186,25 @@ export default function App() {
                 style={styles.input}
                 required
               />
+            </div>
+
+            <div style={styles.inputGroup}>
+              <div style={styles.inputIcon}>
+                <IndianRupee size={18} color="#6b7280" />
+              </div>
+
+              <select
+                name="amount"
+                value={form.amount}
+                onChange={handleChange}
+                style={styles.input}
+                required
+              >
+                <option value="" disabled>Select Amount (₹)</option>
+                <option value="1"> 1</option>
+                <option value="59"> 59</option>
+                <option value="99"> 99</option>
+              </select>
             </div>
           </div>
 
@@ -276,7 +304,10 @@ export default function App() {
 
           <button
             type="submit"
-            style={styles.button}
+            style={{
+              ...styles.button,
+              ...(loading ? styles.buttonDisabled : {})
+            }}
             disabled={loading}
           >
 
@@ -306,9 +337,14 @@ const styles = {
     minHeight: '100vh',
     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '20px',
   },
   container: {
     maxWidth: 550,
+    width: '100%',
     margin: '0 auto',
     background: 'white',
     borderRadius: 16,
@@ -353,6 +389,7 @@ const styles = {
     top: '50%',
     transform: 'translateY(-50%)',
     zIndex: 1,
+    pointerEvents: 'none',
   },
   input: {
     width: '100%',
@@ -363,10 +400,8 @@ const styles = {
     outline: 'none',
     transition: 'all 0.3s ease',
     boxSizing: 'border-box',
-    ':focus': {
-      borderColor: '#4f46e5',
-      boxShadow: '0 0 0 3px rgba(79, 70, 229, 0.1)',
-    },
+    backgroundColor: 'white',
+    appearance: 'none',
   },
   dropZone: {
     border: '2px dashed #e5e7eb',
@@ -396,11 +431,6 @@ const styles = {
     fontSize: '16px',
     color: '#374151',
   },
-  dropZoneSubtext: {
-    margin: 0,
-    fontSize: '14px',
-    color: '#9ca3af',
-  },
   browseButton: {
     padding: '8px 16px',
     backgroundColor: '#4f46e5',
@@ -410,6 +440,7 @@ const styles = {
     cursor: 'pointer',
     border: 'none',
     transition: 'background-color 0.2s',
+    display: 'inline-block',
     ':hover': {
       backgroundColor: '#4338ca',
     },
@@ -441,6 +472,9 @@ const styles = {
     cursor: 'pointer',
     color: '#9ca3af',
     transition: 'color 0.2s',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     ':hover': {
       color: '#ef4444',
     },
@@ -494,9 +528,7 @@ const styles = {
   buttonDisabled: {
     backgroundColor: '#9ca3af',
     cursor: 'not-allowed',
-  },
-  buttonSuccess: {
-    backgroundColor: '#10b981',
+    opacity: 0.7,
   },
   spinner: {
     animation: 'spin 1s linear infinite',
@@ -523,13 +555,6 @@ const styles = {
     fontSize: '14px',
     marginBottom: '15px',
   },
-  footer: {
-    padding: '20px',
-    textAlign: 'center',
-    borderTop: '1px solid #e5e7eb',
-    fontSize: '12px',
-    color: '#9ca3af',
-  },
 };
 
 // Add this to your global CSS or style tag
@@ -537,6 +562,21 @@ const globalStyles = `
   @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
+  }
+  
+  input:focus, select:focus {
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+  }
+  
+  button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+  }
+  
+  label:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(79, 70, 229, 0.2);
   }
 `;
 
