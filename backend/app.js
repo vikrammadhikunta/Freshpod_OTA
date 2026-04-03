@@ -24,7 +24,7 @@ connectDB();
 /* ================= MIDDLEWARE ================= */
 
 app.use(cors({
-  origin: ["https://frontend-yzhf.onrender.com"]
+  origin: "https://frontend-yzhf.onrender.com"
 }));
 
 app.use(express.json());
