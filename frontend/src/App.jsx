@@ -92,8 +92,6 @@ export default function App() {
       setUploadProgress(0);
       setUploadStatus(null);
 
-      // console.log(import.meta.env.VITE_API_URL);
-
       const res = await axios.post(`https://freshpod-ota-r3b9.onrender.com/add`, formData, {
 
         onUploadProgress: (progressEvent) => {
@@ -203,9 +201,13 @@ export default function App() {
                 required
               >
                 <option value="" disabled>Select Amount (₹)</option>
-                <option value="1"> 1</option>
-                <option value="59"> 59</option>
-                <option value="99"> 99</option>
+                <option value="49">₹ 49</option>
+                <option value="59">₹ 59</option>
+                <option value="69">₹ 69</option>
+                <option value="79">₹ 79</option>
+                <option value="89">₹ 89</option>
+                <option value="99">₹ 99</option>
+                <option value="109">₹ 109</option>
               </select>
             </div>
           </div>
@@ -588,4 +590,3 @@ if (typeof document !== 'undefined') {
   style.textContent = globalStyles;
   document.head.appendChild(style);
 }
-

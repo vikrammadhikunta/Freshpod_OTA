@@ -66,15 +66,19 @@ function incrementVersion(version) {
 
 function getQrValueFromAmount(amount) {
   const amountMap = {
-    "1": 0,
+    "49": 0,
     "59": 1,
-    "99": 2
+    "69": 2,
+    "79": 3,
+    "89": 4,
+    "99": 5,
+    "109": 6
   };
   
   const qrValue = amountMap[amount];
   
   if (qrValue === undefined) {
-    throw new Error("Invalid amount selected. Allowed values: 1, 59, 99");
+    throw new Error("Invalid amount selected. Allowed values: 49, 59, 69, 79, 89, 99, 109");
   }
   
   return qrValue;
@@ -255,9 +259,9 @@ app.get("/firmware/:machineId/:qrvalue", async (req, res) => {
 
     const qrValueNum = parseInt(qrvalue);
 
-    if (isNaN(qrValueNum) || ![0, 1, 2].includes(qrValueNum)) {
+    if (isNaN(qrValueNum) || ![0, 1, 2, 3, 4, 5, 6].includes(qrValueNum)) {
       return res.status(400).json({
-        message: "Invalid qrvalue. Allowed values: 0, 1, 2",
+        message: "Invalid qrvalue. Allowed values: 0, 1, 2, 3, 4, 5, 6",
       });
     }
 
